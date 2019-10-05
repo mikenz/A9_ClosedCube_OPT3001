@@ -31,7 +31,10 @@ THE SOFTWARE.
 #ifndef CLOSEDCUBE_OPT3001
 #define CLOSEDCUBE_OPT3001
 
-#include <Arduino.h>
+#include "api_hal_i2c.h"
+
+// ADDR to GND
+#define OPT3001_I2CADDR 0x44
 
 typedef enum {
 	RESULT		= 0x00,
@@ -76,7 +79,7 @@ typedef union {
 		uint8_t OverflowFlag : 1;
 		uint8_t ModeOfConversionOperation : 2;
 		uint8_t ConvertionTime : 1;
-		uint8_t RangeNumber : 4;		
+		uint8_t RangeNumber : 4;
 	};
 	uint16_t rawData;
 } OPT3001_Config;
@@ -89,9 +92,9 @@ struct OPT3001 {
 
 class ClosedCube_OPT3001 {
 public:
-	ClosedCube_OPT3001();
+	ClosedCube_OPT3001(uint8_t address = OPT3001_I2CADDR);
 
-	OPT3001_ErrorCode begin(uint8_t address);
+	OPT3001_ErrorCode begin(I2C_ID_t i2c);
 
 	uint16_t readManufacturerID();
 	uint16_t readDeviceID();
@@ -99,11 +102,14 @@ public:
 	OPT3001 readResult();
 	OPT3001 readHighLimit();
 	OPT3001 readLowLimit();
-	
+
 	OPT3001_Config readConfig();
 	OPT3001_ErrorCode writeConfig(OPT3001_Config config);
 
 private:
+	I2C_ID_t _i2c;
+	I2C_Config_t _i2cConfig;
+
 	uint8_t _address;
 
 	OPT3001_ErrorCode writeData(OPT3001_Commands command);
@@ -115,5 +121,4 @@ private:
 	float calculateLux(OPT3001_ER er);
 };
 
-
-#endif 
+#endif

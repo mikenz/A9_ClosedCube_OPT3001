@@ -27,19 +27,18 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 */
-#include <Wire.h>
 
 #include "ClosedCube_OPT3001.h"
+#include "api_debug.h"
+#include "api_os.h"
 
-ClosedCube_OPT3001::ClosedCube_OPT3001()
+ClosedCube_OPT3001::ClosedCube_OPT3001(uint8_t address) : _address(address) {}
+
+OPT3001_ErrorCode ClosedCube_OPT3001::begin(I2C_ID_t i2c)
 {
-}
-
-OPT3001_ErrorCode ClosedCube_OPT3001::begin(uint8_t address) {
-	OPT3001_ErrorCode error = NO_ERROR;
-	_address = address;
-	Wire.begin();
-
+  	_i2c = i2c;
+  	_i2cConfig.freq = I2C_FREQ_100K;
+  	I2C_Init(_i2c, _i2cConfig);
 	return NO_ERROR;
 }
 
@@ -68,11 +67,19 @@ OPT3001_Config ClosedCube_OPT3001::readConfig() {
 }
 
 OPT3001_ErrorCode ClosedCube_OPT3001::writeConfig(OPT3001_Config config) {
-	Wire.beginTransmission(_address);
-	Wire.write(CONFIG);
-	Wire.write(config.rawData >> 8);
-	Wire.write(config.rawData & 0x00FF);
-	return (OPT3001_ErrorCode)(-10 * Wire.endTransmission());
+	uint8_t data[3] = {
+		CONFIG,					// Register
+		config.rawData >> 8,	// Upper 8-bits
+		config.rawData & 0x00FF // Lower 8-bits
+	};
+	I2C_Error_t error = I2C_Transmit(_i2c, _address, &data[0], 3, I2C_DEFAULT_TIME_OUT);
+	if (error != I2C_ERROR_NONE)
+	{
+		Trace(1, "ClosedCube_OPT3001::writeConfig transmit error: 0X%02x", error);
+		return WIRE_I2C_UNKNOW_ERROR;
+	}
+
+	return NO_ERROR;
 }
 
 OPT3001 ClosedCube_OPT3001::readResult() {
@@ -97,8 +104,50 @@ OPT3001 ClosedCube_OPT3001::readRegister(OPT3001_Commands command) {
 		OPT3001_ER er;
 		error = readData(&er.rawData);
 		if (error == NO_ERROR) {
+
+			float _result = 0;
+			switch (er.Exponent)
+			{
+				case 0: //*0.015625
+					_result = er.Result >> 6;
+					break;
+				case 1: //*0.03125
+					_result = er.Result >> 5;
+					break;
+				case 2: //*0.0625
+					_result = er.Result >> 4;
+					break;
+				case 3: //*0.125
+					_result = er.Result >> 3;
+					break;
+				case 4: //*0.25
+					_result = er.Result >> 2;
+					break;
+				case 5: //*0.5
+					_result = er.Result >> 1;
+					break;
+				case 6:
+					_result = er.Result;
+					break;
+				case 7: //*2
+					_result = er.Result << 1;
+					break;
+				case 8: //*4
+					_result = er.Result << 2;
+					break;
+				case 9: //*8
+					_result = er.Result << 3;
+					break;
+				case 10: //*16
+					_result = er.Result << 4;
+					break;
+				case 11: //*32
+					_result = er.Result << 5;
+					break;
+			}
+
 			result.raw = er;
-			result.lux = 0.01*pow(2, er.Exponent)*er.Result;
+			result.lux = 0.01 * _result;
 		}
 		else {
 			result.error = error;
@@ -113,27 +162,33 @@ OPT3001 ClosedCube_OPT3001::readRegister(OPT3001_Commands command) {
 
 OPT3001_ErrorCode ClosedCube_OPT3001::writeData(OPT3001_Commands command)
 {
-	Wire.beginTransmission(_address);
-	Wire.write(command);
-	return (OPT3001_ErrorCode)(-10 * Wire.endTransmission(true));
+	uint8_t reg = command;
+	I2C_Error_t error = I2C_Transmit(_i2c, _address, &reg, 1, I2C_DEFAULT_TIME_OUT);
+	if (error != I2C_ERROR_NONE)
+	{
+		Trace(1, "ClosedCube_OPT3001::writeData transmit error: 0X%02x", error);
+		return WIRE_I2C_UNKNOW_ERROR;
+	}
+
+	return NO_ERROR;
 }
 
 OPT3001_ErrorCode ClosedCube_OPT3001::readData(uint16_t* data)
 {
-	uint8_t	buf[2];
-
-	Wire.requestFrom(_address, (uint8_t)2);
+	uint8_t buf[2];
 
 	int counter = 0;
-	while (Wire.available() < 2)
+	I2C_Error_t error = I2C_Receive(_i2c, _address, &buf[0], 2, I2C_DEFAULT_TIME_OUT);
+	while (error != I2C_ERROR_NONE)
 	{
 		counter++;
-		delay(10);
-		if (counter > 250)
+		OS_Sleep(10);
+		if (counter > 250) {
+			Trace(1, "ClosedCube_OPT3001::readData recieve error: 0X%02x", error);
 			return TIMEOUT_ERROR;
+		}
 	}
 
-	Wire.readBytes(buf, 2);
 	*data = (buf[0] << 8) | buf[1];
 
 	return NO_ERROR;

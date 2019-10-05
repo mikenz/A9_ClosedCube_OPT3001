@@ -105,49 +105,46 @@ OPT3001 ClosedCube_OPT3001::readRegister(OPT3001_Commands command) {
 		error = readData(&er.rawData);
 		if (error == NO_ERROR) {
 
-			float _result = 0;
 			switch (er.Exponent)
 			{
-				case 0: //*0.015625
-					_result = er.Result >> 6;
+				case 0:
+					result.lux = 0.01 * er.Result * 0.01;
 					break;
-				case 1: //*0.03125
-					_result = er.Result >> 5;
+				case 1:
+					result.lux = 0.01 * er.Result * 0.02;
 					break;
-				case 2: //*0.0625
-					_result = er.Result >> 4;
+				case 2:
+					result.lux = 0.01 * er.Result * 0.04;
 					break;
-				case 3: //*0.125
-					_result = er.Result >> 3;
+				case 3:
+					result.lux = 0.01 * er.Result * 0.08;
 					break;
-				case 4: //*0.25
-					_result = er.Result >> 2;
+				case 4:
+					result.lux = 0.01 * er.Result * 0.16;
 					break;
-				case 5: //*0.5
-					_result = er.Result >> 1;
+				case 5:
+					result.lux = 0.01 * er.Result * 0.32;
 					break;
 				case 6:
-					_result = er.Result;
+					result.lux = 0.01 * er.Result * 0.64;
 					break;
-				case 7: //*2
-					_result = er.Result << 1;
+				case 7:
+					result.lux = 0.01 * er.Result * 1.28;
 					break;
-				case 8: //*4
-					_result = er.Result << 2;
+				case 8:
+					result.lux = 0.01 * er.Result * 2.56;
 					break;
-				case 9: //*8
-					_result = er.Result << 3;
+				case 9:
+					result.lux = 0.01 * er.Result * 5.12;
 					break;
-				case 10: //*16
-					_result = er.Result << 4;
+				case 10:
+					result.lux = 0.01 * er.Result * 10.24;
 					break;
-				case 11: //*32
-					_result = er.Result << 5;
+				case 11:
+					result.lux = 0.01 * er.Result * 20.48;
 					break;
 			}
-
 			result.raw = er;
-			result.lux = 0.01 * _result;
 		}
 		else {
 			result.error = error;
